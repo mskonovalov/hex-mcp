@@ -40,3 +40,10 @@ def test_requires_api_token(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(ValidationError):
         Settings(_env_file=None)
+
+
+def test_rejects_empty_api_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HEX_API_TOKEN", "")
+
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)

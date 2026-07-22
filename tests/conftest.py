@@ -17,7 +17,25 @@ def openapi_document() -> dict[str, Any]:
             "/v1/projects": {
                 "get": {
                     "operationId": "ListProjects",
-                    "responses": {"200": {"description": "Projects"}},
+                    "responses": {
+                        "200": {
+                            "description": "Projects",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "values": {"type": "array"},
+                                            "projectSecrets": {
+                                                "type": "array",
+                                                "items": {"type": "string"},
+                                            },
+                                        },
+                                    }
+                                }
+                            },
+                        }
+                    },
                 },
                 "post": {
                     "operationId": "CreateProject",

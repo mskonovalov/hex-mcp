@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,15 @@ from urllib.parse import urlparse
 import httpx
 
 HTTP_METHODS = frozenset({"delete", "get", "patch", "post", "put"})
+HEX_PATH_REPLACEMENTS = {
+    "/v1/semantic-(projects|models)/{semanticProjectId}": (
+        "/v1/semantic-projects/{semanticProjectId}"
+    ),
+    "/v1/semantic-(projects|models)/{semanticProjectId}/ingest": (
+        "/v1/semantic-projects/{semanticProjectId}/ingest"
+    ),
+}
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -34,8 +44,9 @@ async def load_openapi(source: str, timeout_seconds: float = 30.0) -> LoadedOpen
     if not isinstance(document, dict):
         raise ValueError("OpenAPI document must be a JSON object")
 
-    validate_openapi(document)
     canonical = json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
+    document = normalize_hex_openapi(document)
+    validate_openapi(document)
     info = document.get("info", {})
     version = info.get("version", "unknown") if isinstance(info, dict) else "unknown"
     return LoadedOpenAPI(
@@ -44,6 +55,37 @@ async def load_openapi(source: str, timeout_seconds: float = 30.0) -> LoadedOpen
         version=str(version),
         digest=hashlib.sha256(canonical).hexdigest(),
     )
+
+
+def normalize_hex_openapi(document: dict[str, Any]) -> dict[str, Any]:
+    """Correct two regex-style path keys published in Hex's OpenAPI document.
+
+    IngestSemanticProject and UpdateSemanticProject use ``(projects|models)``
+    inside their path keys. OpenAPI treats that text literally, so FastMCP sends
+    requests to a route that Hex returns as 404. Hex recognizes both expanded
+    aliases; ``semantic-projects`` matches the current operation and parameter
+    naming, so the two exact keys are replaced before FastMCP parses the document.
+    """
+    paths = document.get("paths")
+    if not isinstance(paths, dict):
+        return document
+
+    matching_paths = set(paths).intersection(HEX_PATH_REPLACEMENTS)
+    if not matching_paths:
+        return document
+
+    normalized_paths = {
+        HEX_PATH_REPLACEMENTS.get(path, path): path_item
+        for path, path_item in paths.items()
+    }
+    if len(normalized_paths) != len(paths):
+        raise ValueError("Hex semantic path normalization would overwrite a path")
+
+    LOGGER.warning(
+        "Normalized %d malformed Hex semantic OpenAPI path(s)",
+        len(matching_paths),
+    )
+    return {**document, "paths": normalized_paths}
 
 
 def validate_openapi(document: dict[str, Any]) -> None:

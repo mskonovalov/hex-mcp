@@ -53,6 +53,8 @@ From a local checkout:
 }
 ```
 
+For stdio, the MCP client passes `HEX_API_TOKEN` only to the child process. Do not put the token in command-line arguments.
+
 ## Configuration
 
 | Variable | Default | Purpose |
@@ -77,6 +79,17 @@ uv run pytest
 ```
 
 The repository does not vendor Hex's specification. Contract behavior can be tested offline by setting `HEX_OPENAPI_SPEC` to an independently supplied local copy.
+
+## Safety and reliability
+
+- Every tool has MCP read-only, destructive, idempotent, and open-world annotations derived from its official operation and HTTP method.
+- Tool results and Hex error bodies recursively redact known credential fields and Hex bearer tokens before they reach MCP output or error logging.
+- Hex HTTP errors preserve the status, reason, and trace ID in a structured MCP error without exposing internal stack traces.
+- GET requests retry transient `429`, `502`, `503`, and `504` responses up to twice, respect `Retry-After`, and use bounded exponential backoff. Write requests are never retried automatically.
+
+Hex's specification currently publishes two semantic paths with backend regex syntax as literal OpenAPI paths. Those literals return `404`, while both expanded routes exist. The loader normalizes them to the current `/v1/semantic-projects/...` naming before generating tools while retaining the original specification digest for observability.
+
+Streamable HTTP currently uses the single server-wide `HEX_API_TOKEN` and has no inbound client authentication. Keep the default loopback bind unless access is protected by a trusted authentication proxy.
 
 ## Design documents
 
