@@ -4,6 +4,8 @@ An MIT-licensed MCP server generated from the official Hex public API specificat
 
 The server loads Hex's current OpenAPI document at startup and exposes its operations as deterministic, snake_case MCP tools through FastMCP.
 
+The PyPI distribution is named `hex-openapi-mcp`; the installed command and Python import remain `hex-mcp` and `hex_mcp`.
+
 ## Capability modes
 
 - `read-only` exposes only operations classified as non-mutating, regardless of the configured Hex token's permissions.
@@ -11,7 +13,31 @@ The server loads Hex's current OpenAPI document at startup and exposes its opera
 
 `read-only` is the default. It registers GET operations and the non-mutating `export_project` POST operation. Mutating tools do not exist in the MCP catalog in this mode, even when `HEX_API_TOKEN` has write permissions.
 
-## Run locally
+## Install
+
+Requirements: Python 3.12 or newer and [uv](https://docs.astral.sh/uv/).
+
+Run the server directly from PyPI:
+
+```bash
+HEX_API_TOKEN=your_hex_token uvx --from hex-openapi-mcp hex-mcp
+```
+
+Enable the complete API surface explicitly:
+
+```bash
+HEX_API_TOKEN=your_hex_token HEX_MCP_MODE=full uvx --from hex-openapi-mcp hex-mcp
+```
+
+The default transport is stdio. To run Streamable HTTP:
+
+```bash
+HEX_API_TOKEN=your_hex_token HEX_TRANSPORT=http uvx --from hex-openapi-mcp hex-mcp
+```
+
+It listens on `http://127.0.0.1:8000/mcp` by default.
+
+## Run from source
 
 Requirements: Python 3.12 or newer and [uv](https://docs.astral.sh/uv/).
 
@@ -20,30 +46,16 @@ uv sync --locked --dev
 HEX_API_TOKEN=your_hex_token uv run hex-mcp
 ```
 
-Enable the complete API surface explicitly:
-
-```bash
-HEX_API_TOKEN=your_hex_token HEX_MCP_MODE=full uv run hex-mcp
-```
-
-The default transport is stdio. To run Streamable HTTP:
-
-```bash
-HEX_API_TOKEN=your_hex_token HEX_TRANSPORT=http uv run hex-mcp
-```
-
-It listens on `http://127.0.0.1:8000/mcp` by default.
-
 ## MCP client configuration
 
-From a local checkout:
+From PyPI:
 
 ```json
 {
   "mcpServers": {
     "hex": {
-      "command": "uv",
-      "args": ["--directory", "/absolute/path/to/hex-mcp", "run", "hex-mcp"],
+      "command": "uvx",
+      "args": ["--from", "hex-openapi-mcp", "hex-mcp"],
       "env": {
         "HEX_API_TOKEN": "your_hex_token",
         "HEX_MCP_MODE": "read-only"
@@ -52,6 +64,8 @@ From a local checkout:
   }
 }
 ```
+
+For a local checkout, use `"command": "uv"` with `"args": ["--directory", "/absolute/path/to/hex-mcp", "run", "hex-mcp"]`.
 
 For stdio, the MCP client passes `HEX_API_TOKEN` only to the child process. Do not put the token in command-line arguments.
 
@@ -95,3 +109,4 @@ Streamable HTTP currently uses the single server-wide `HEX_API_TOKEN` and has no
 
 - [Capability matrix](docs/capability-matrix.md)
 - [Implementation plan](docs/implementation-plan.md)
+- [Release process](docs/releasing.md)

@@ -478,7 +478,7 @@ wheels = [
 ]
 
 [[package]]
-name = "hex-mcp"
+name = "hex-openapi-mcp"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
