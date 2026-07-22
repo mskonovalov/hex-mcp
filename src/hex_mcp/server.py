@@ -23,7 +23,7 @@ from mcp.types import ToolAnnotations
 from hex_mcp import __version__
 from hex_mcp.config import MCPMode, Settings, Transport
 from hex_mcp.openapi import LoadedOpenAPI, load_openapi, operation_names
-from hex_mcp.security import HardenedToolTransform
+from hex_mcp.tool_safety import HardenedToolTransform
 
 LOGGER = logging.getLogger(__name__)
 
