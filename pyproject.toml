@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "hex-openapi-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "MCP server generated from Hex's official OpenAPI specification"
 readme = "README.md"
 license = "MIT"
@@ -19,6 +19,7 @@ dependencies = [
 ]
 
 [project.scripts]
+hex-openapi-mcp = "hex_mcp.server:main"
 hex-mcp = "hex_mcp.server:main"
 
 [project.urls]

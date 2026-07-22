@@ -4,7 +4,7 @@ An MIT-licensed MCP server generated from the official Hex public API specificat
 
 The server loads Hex's current OpenAPI document at startup and exposes its operations as deterministic, snake_case MCP tools through FastMCP.
 
-The PyPI distribution is named `hex-openapi-mcp`; the installed command and Python import remain `hex-mcp` and `hex_mcp`.
+The PyPI distribution and installed command are named `hex-openapi-mcp`. The shorter `hex-mcp` command remains available, and the Python import is `hex_mcp`.
 
 ## Capability modes
 
@@ -20,19 +20,19 @@ Requirements: Python 3.12 or newer and [uv](https://docs.astral.sh/uv/).
 Run the server directly from PyPI:
 
 ```bash
-HEX_API_TOKEN=your_hex_token uvx --from hex-openapi-mcp hex-mcp
+HEX_API_TOKEN=your_hex_token uvx hex-openapi-mcp
 ```
 
 Enable the complete API surface explicitly:
 
 ```bash
-HEX_API_TOKEN=your_hex_token HEX_MCP_MODE=full uvx --from hex-openapi-mcp hex-mcp
+HEX_API_TOKEN=your_hex_token HEX_MCP_MODE=full uvx hex-openapi-mcp
 ```
 
 The default transport is stdio. To run Streamable HTTP:
 
 ```bash
-HEX_API_TOKEN=your_hex_token HEX_TRANSPORT=http uvx --from hex-openapi-mcp hex-mcp
+HEX_API_TOKEN=your_hex_token HEX_TRANSPORT=http uvx hex-openapi-mcp
 ```
 
 It listens on `http://127.0.0.1:8000/mcp` by default.
@@ -43,7 +43,7 @@ Requirements: Python 3.12 or newer and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync --locked --dev
-HEX_API_TOKEN=your_hex_token uv run hex-mcp
+HEX_API_TOKEN=your_hex_token uv run hex-openapi-mcp
 ```
 
 ## MCP client configuration
@@ -55,7 +55,7 @@ From PyPI:
   "mcpServers": {
     "hex": {
       "command": "uvx",
-      "args": ["--from", "hex-openapi-mcp", "hex-mcp"],
+      "args": ["hex-openapi-mcp"],
       "env": {
         "HEX_API_TOKEN": "your_hex_token",
         "HEX_MCP_MODE": "read-only"
@@ -65,7 +65,7 @@ From PyPI:
 }
 ```
 
-For a local checkout, use `"command": "uv"` with `"args": ["--directory", "/absolute/path/to/hex-mcp", "run", "hex-mcp"]`.
+For a local checkout, use `"command": "uv"` with `"args": ["--directory", "/absolute/path/to/hex-mcp", "run", "hex-openapi-mcp"]`.
 
 For stdio, the MCP client passes `HEX_API_TOKEN` only to the child process. Do not put the token in command-line arguments.
 
