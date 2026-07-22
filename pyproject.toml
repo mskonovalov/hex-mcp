@@ -1,0 +1,47 @@
+[build-system]
+requires = ["uv_build>=0.11.31,<0.12"]
+build-backend = "uv_build"
+
+[project]
+name = "hex-mcp"
+version = "0.1.0"
+description = "MCP server generated from Hex's official OpenAPI specification"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+authors = [{ name = "Mikhail Konovalov" }]
+dependencies = [
+    "fastmcp>=3.4,<4",
+    "httpx>=0.28,<1",
+    "pydantic-settings>=2.10,<3",
+]
+
+[project.scripts]
+hex-mcp = "hex_mcp.server:main"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19,<2",
+    "pytest>=9,<10",
+    "pytest-asyncio>=1.3,<2",
+    "pytest-cov>=7,<8",
+    "ruff>=0.14,<0.15",
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+addopts = "--cov=hex_mcp --cov-report=term-missing --cov-fail-under=90"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
