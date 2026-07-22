@@ -13,8 +13,14 @@ from urllib.parse import urlparse
 import httpx
 
 HTTP_METHODS = frozenset({"delete", "get", "patch", "post", "put"})
-SEMANTIC_ROUTE_PATTERN = "/v1/semantic-(projects|models)"
-SEMANTIC_ROUTE_CANONICAL = "/v1/semantic-projects"
+HEX_PATH_REPLACEMENTS = {
+    "/v1/semantic-(projects|models)/{semanticProjectId}": (
+        "/v1/semantic-projects/{semanticProjectId}"
+    ),
+    "/v1/semantic-(projects|models)/{semanticProjectId}/ingest": (
+        "/v1/semantic-projects/{semanticProjectId}/ingest"
+    ),
+}
 LOGGER = logging.getLogger(__name__)
 
 
@@ -39,7 +45,7 @@ async def load_openapi(source: str, timeout_seconds: float = 30.0) -> LoadedOpen
         raise ValueError("OpenAPI document must be a JSON object")
 
     canonical = json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
-    document = normalize_openapi(document)
+    document = normalize_hex_openapi(document)
     validate_openapi(document)
     info = document.get("info", {})
     version = info.get("version", "unknown") if isinstance(info, dict) else "unknown"
@@ -51,35 +57,33 @@ async def load_openapi(source: str, timeout_seconds: float = 30.0) -> LoadedOpen
     )
 
 
-def normalize_openapi(document: dict[str, Any]) -> dict[str, Any]:
+def normalize_hex_openapi(document: dict[str, Any]) -> dict[str, Any]:
+    """Correct two regex-style path keys published in Hex's OpenAPI document.
+
+    IngestSemanticProject and UpdateSemanticProject use ``(projects|models)``
+    inside their path keys. OpenAPI treats that text literally, so FastMCP sends
+    requests to a route that Hex returns as 404. Hex recognizes both expanded
+    aliases; ``semantic-projects`` matches the current operation and parameter
+    naming, so the two exact keys are replaced before FastMCP parses the document.
+    """
     paths = document.get("paths")
     if not isinstance(paths, dict):
         return document
 
-    matching_paths = [
-        path
-        for path in paths
-        if isinstance(path, str) and SEMANTIC_ROUTE_PATTERN in path
-    ]
+    matching_paths = set(paths).intersection(HEX_PATH_REPLACEMENTS)
     if not matching_paths:
         return document
 
-    normalized_paths = dict(paths)
-    for path in matching_paths:
-        canonical_path = path.replace(
-            SEMANTIC_ROUTE_PATTERN,
-            SEMANTIC_ROUTE_CANONICAL,
-        )
-        if canonical_path in normalized_paths:
-            raise ValueError(f"Duplicate normalized OpenAPI path: {canonical_path}")
-        normalized_paths[canonical_path] = normalized_paths.pop(path)
+    normalized_paths = {
+        HEX_PATH_REPLACEMENTS.get(path, path): path_item
+        for path, path_item in paths.items()
+    }
+    if len(normalized_paths) != len(paths):
+        raise ValueError("Hex semantic path normalization would overwrite a path")
 
-    # Hex publishes backend route alternation as a literal OpenAPI path, which
-    # returns 404. Both expanded routes exist; semantic-projects is current naming.
     LOGGER.warning(
-        "Normalized %d Hex semantic OpenAPI path(s) to %s",
+        "Normalized %d malformed Hex semantic OpenAPI path(s)",
         len(matching_paths),
-        SEMANTIC_ROUTE_CANONICAL,
     )
     return {**document, "paths": normalized_paths}
 

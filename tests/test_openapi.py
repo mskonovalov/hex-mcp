@@ -8,7 +8,7 @@ import pytest
 
 from hex_mcp.openapi import (
     load_openapi,
-    normalize_openapi,
+    normalize_hex_openapi,
     operation_names,
     to_snake_case,
     validate_openapi,
@@ -61,7 +61,7 @@ def test_normalizes_hex_semantic_route(openapi_document: dict[str, Any]) -> None
         "/v1/semantic-(projects|models)/{semanticProjectId}/ingest"
     ] = operation
 
-    normalized = normalize_openapi(openapi_document)
+    normalized = normalize_hex_openapi(openapi_document)
 
     assert (
         normalized["paths"]["/v1/semantic-projects/{semanticProjectId}/ingest"]

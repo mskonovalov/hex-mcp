@@ -12,7 +12,7 @@ from pydantic import SecretStr
 
 import hex_mcp.server as server_module
 from hex_mcp.config import MCPMode, Settings, Transport
-from hex_mcp.openapi import LoadedOpenAPI, normalize_openapi
+from hex_mcp.openapi import LoadedOpenAPI, normalize_hex_openapi
 from hex_mcp.server import (
     ServerBundle,
     build_server,
@@ -218,7 +218,7 @@ async def test_semantic_tool_uses_normalized_api_path(
         return httpx.Response(201, json={})
 
     loaded = LoadedOpenAPI(
-        document=normalize_openapi(openapi_document),
+        document=normalize_hex_openapi(openapi_document),
         source="test-openapi.json",
         version="test",
         digest="test-digest",
