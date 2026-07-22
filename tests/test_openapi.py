@@ -1,0 +1,84 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from hex_mcp.openapi import (
+    load_openapi,
+    operation_names,
+    to_snake_case,
+    validate_openapi,
+)
+
+
+async def test_loads_local_openapi(
+    tmp_path: Path, openapi_document: dict[str, Any]
+) -> None:
+    source = tmp_path / "openapi.json"
+    source.write_text(json.dumps(openapi_document), encoding="utf-8")
+
+    loaded = await load_openapi(str(source))
+
+    assert loaded.document == openapi_document
+    assert loaded.version == "test"
+    assert len(loaded.digest) == 64
+
+
+@pytest.mark.parametrize(
+    ("operation_id", "expected"),
+    [
+        ("ListProjects", "list_projects"),
+        ("GetHTTPStatus", "get_http_status"),
+        ("Me", "me"),
+    ],
+)
+def test_to_snake_case(operation_id: str, expected: str) -> None:
+    assert to_snake_case(operation_id) == expected
+
+
+def test_builds_names_from_operation_ids(openapi_document: dict[str, Any]) -> None:
+    assert operation_names(openapi_document) == {
+        "ListProjects": "list_projects",
+        "CreateProject": "create_project",
+        "ExportProject": "export_project",
+        "UpdateProject": "update_project",
+        "DeleteProject": "delete_project",
+    }
+
+
+def test_rejects_missing_operation_id(openapi_document: dict[str, Any]) -> None:
+    del openapi_document["paths"]["/v1/projects"]["get"]["operationId"]
+
+    with pytest.raises(ValueError, match="Missing operationId"):
+        validate_openapi(openapi_document)
+
+
+def test_rejects_missing_openapi_version(openapi_document: dict[str, Any]) -> None:
+    del openapi_document["openapi"]
+
+    with pytest.raises(ValueError, match="missing an openapi version"):
+        validate_openapi(openapi_document)
+
+
+def test_rejects_missing_paths(openapi_document: dict[str, Any]) -> None:
+    del openapi_document["paths"]
+
+    with pytest.raises(ValueError, match="must contain paths"):
+        validate_openapi(openapi_document)
+
+
+def test_rejects_duplicate_operation_id(openapi_document: dict[str, Any]) -> None:
+    openapi_document["paths"]["/v1/projects"]["post"]["operationId"] = "ListProjects"
+
+    with pytest.raises(ValueError, match="Duplicate operationId"):
+        validate_openapi(openapi_document)
+
+
+def test_rejects_missing_responses(openapi_document: dict[str, Any]) -> None:
+    del openapi_document["paths"]["/v1/projects"]["get"]["responses"]
+
+    with pytest.raises(ValueError, match="Missing responses"):
+        validate_openapi(openapi_document)
