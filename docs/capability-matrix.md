@@ -2,64 +2,80 @@
 
 Research date: 2026-07-22.
 
-The parity baseline is the 26 tools documented by the abandoned [franccesco/hex-mcp README](https://github.com/franccesco/hex-mcp/blob/main/README.md). This document records behavior only; its AGPL-licensed source code, tests, and documentation will not be copied.
+The source of truth is Hex's official [OpenAPI specification](https://static.hex.site/openapi.json), which currently describes 52 operations. CLI coverage was checked with the official [Hex CLI](https://learn.hex.tech/docs/api-integrations/cli) version `1.2026.07.21`.
 
-The CLI column was checked against the official [Hex CLI documentation](https://learn.hex.tech/docs/api-integrations/cli) and `hex 1.2026.07.21 --help`. The public API column was checked against the official [Hex API reference](https://learn.hex.tech/docs/api-integrations/api/reference). "Planned" means accepted into the proposed parity release, not already implemented.
+`read-only` is a hard server-side filter, independent of Hex token permissions. `full` exposes every operation in the specification.
 
-| Area | Parity tool | Capability | Official CLI | Public API | Our MCP decision |
+| Area | Official operation | Capability | Official CLI | Read-only | Full |
 | --- | --- | --- | --- | --- | --- |
-| Projects | `list_hex_projects` | List accessible projects with filters and pagination | Yes: `hex project list` | Direct: `ListProjects` | Planned: read-only phase |
-| Projects | `search_hex_projects` | Search projects by a text pattern | Partial: list filters, but no text-search command | Composed from paginated `ListProjects` results | Planned: read-only phase |
-| Projects | `get_hex_project` | Get project metadata | Yes: `hex project get` | Direct: `GetProject` | Planned: read-only phase |
-| Runs | `run_hex_project` | Trigger a published project run with inputs | Yes: `hex app run`; draft runs also exist as `hex project run` | Direct: `RunProject` | Planned: execution phase |
-| Runs | `get_hex_run_status` | Get one run's status | Yes: `hex run status` | Direct: `GetRunStatus` | Planned: read-only phase |
-| Runs | `get_hex_project_runs` | List a project's run history | Yes: `hex run list` | Direct: `GetProjectRuns` | Planned: read-only phase |
-| Runs | `cancel_hex_run` | Cancel an active run | Yes: `hex run cancel` | Direct: `CancelRun` | Planned: execution phase |
-| Cells | `list_hex_cells` | List project cells and supported source content | Yes: `hex cell list` | Direct: `ListCells` | Planned: read-only phase |
-| Cells | `update_hex_cell` | Update code, SQL, Markdown, output dataframe, or data connection fields supported by the API | Yes: `hex cell update` | Direct: `UpdateCell` | Planned: execution phase |
-| Project sharing | `update_hex_project_user_sharing` | Grant or revoke project access for users | No write command | Direct: `EditProjectSharingUsers` | Planned: sharing phase |
-| Project sharing | `update_hex_project_group_sharing` | Grant or revoke project access for groups | No write command | Direct: `EditProjectSharingGroups` | Planned: sharing phase |
-| Project sharing | `update_hex_project_collection_sharing` | Add or remove a project from collections | No write command | Direct: `EditProjectSharingCollections` | Planned: sharing phase |
-| Project sharing | `update_hex_project_workspace_sharing` | Change workspace-wide and public access | No write command | Direct: `EditProjectSharingOrgAndPublic` | Planned: sharing phase |
-| Collections | `list_hex_collections` | List collections with pagination | Yes: `hex collection list` | Direct: `ListCollections` | Planned: read-only phase |
-| Collections | `get_hex_collection` | Get collection details | Yes: `hex collection get` | Direct: `GetCollection` | Planned: read-only phase |
-| Collections | `create_hex_collection` | Create a collection with optional sharing | No | Direct: `CreateCollection` | Planned: collections and groups phase |
-| Collections | `update_hex_collection` | Update collection metadata or sharing | No | Direct: `EditCollection` | Planned: collections and groups phase |
-| Groups | `list_hex_groups` | List workspace groups | Yes: `hex group list` | Direct: `ListGroups` | Planned: read-only phase |
-| Groups | `get_hex_group` | Get group details | Yes: `hex group get` | Direct: `GetGroup` | Planned: read-only phase |
-| Groups | `create_hex_group` | Create a group, optionally with members | Partial: `hex group create` creates a named group but exposes no initial-members option | Direct: `CreateGroup` | Planned: collections and groups phase |
-| Groups | `update_hex_group` | Rename a group or add/remove members | No | Direct: `EditGroup` | Planned: collections and groups phase |
-| Groups | `delete_hex_group` | Delete a group | Yes: `hex group delete` | Direct: `DeleteGroup` | Planned: collections and groups phase |
-| Connections | `list_hex_data_connections` | List data connections | Yes: `hex connection list` | Direct: `ListDataConnections` | Planned: read-only phase |
-| Connections | `get_hex_data_connection` | Get data connection metadata | Yes: `hex connection get` | Direct: `GetDataConnection` | Planned: read-only phase |
-| Connections | `create_hex_data_connection` | Create a supported data connection | No | Direct: `CreateDataConnection` | Planned: connections phase |
-| Connections | `update_hex_data_connection` | Update configuration, credentials, or sharing | No | Direct: `EditDataConnection` | Planned: connections phase |
+| Embedding | `CreatePresignedUrl` | Create an embedded app URL | No | No | Yes |
+| Projects | `CreateProject` | Create a project | `hex project create` | No | Yes |
+| Projects | `ListProjects` | List projects | `hex project list` | Yes | Yes |
+| Projects | `GetQueriedTables` | List tables queried by a project | No | Yes | Yes |
+| Projects | `EditProjectSharingCollections` | Change collection sharing | No | No | Yes |
+| Projects | `EditProjectSharingOrgAndPublic` | Change workspace and public sharing | No | No | Yes |
+| Projects | `EditProjectSharingGroups` | Change group sharing | No | No | Yes |
+| Projects | `EditProjectSharingUsers` | Change user sharing | No | No | Yes |
+| Projects | `UpdateProject` | Update project metadata | No direct command | No | Yes |
+| Projects | `GetProject` | Get project details | `hex project get` | Yes | Yes |
+| Semantic projects | `IngestSemanticProject` | Ingest a semantic project or model | No | No | Yes |
+| Semantic projects | `UpdateSemanticProject` | Update a semantic project or model | No | No | Yes |
+| Runs | `RunProject` | Trigger a published project run | `hex app run` | No | Yes |
+| Runs | `GetProjectRuns` | List project runs | `hex run list` | Yes | Yes |
+| Runs | `GetRunStatus` | Get run status | `hex run status` | Yes | Yes |
+| Runs | `CancelRun` | Cancel a run | `hex run cancel` | No | Yes |
+| Groups | `GetGroup` | Get group details | `hex group get` | Yes | Yes |
+| Groups | `DeleteGroup` | Delete a group | `hex group delete` | No | Yes |
+| Groups | `EditGroup` | Rename a group or change members | No | No | Yes |
+| Groups | `ListGroups` | List groups | `hex group list` | Yes | Yes |
+| Groups | `CreateGroup` | Create a group | `hex group create` | No | Yes |
+| Data connections | `GetDataConnection` | Get connection details | `hex connection get` | Yes | Yes |
+| Data connections | `EditDataConnection` | Update connection configuration or sharing | No | No | Yes |
+| Data connections | `ListDataConnections` | List connections | `hex connection list` | Yes | Yes |
+| Data connections | `CreateDataConnection` | Create a connection | No | No | Yes |
+| Data connections | `UpdateDataConnectionSchema` | Refresh or update connection schema | No | No | Yes |
+| Collections | `GetCollection` | Get collection details | `hex collection get` | Yes | Yes |
+| Collections | `EditCollection` | Update collection metadata or sharing | No | No | Yes |
+| Collections | `ListCollections` | List collections | `hex collection list` | Yes | Yes |
+| Collections | `CreateCollection` | Create a collection | No | No | Yes |
+| Guides | `UpsertGuideDraft` | Create or update a guide draft | Partial: `hex guide preview` | No | Yes |
+| Guides | `PublishGuideDrafts` | Publish guide drafts | `hex guide publish` | No | Yes |
+| Guides | `DeleteGuideDraft` | Delete a guide draft | Partial: `hex guide preview --prune` | No | Yes |
+| Cells | `GetChartImageFromLogic` | Get a chart image from project logic | No direct command | Yes | Yes |
+| Cells | `GetCell` | Get a cell | `hex cell get` | Yes | Yes |
+| Cells | `UpdateCell` | Update cell source or connection | `hex cell update` | No | Yes |
+| Cells | `DeleteCell` | Delete a cell | `hex cell delete` | No | Yes |
+| Cells | `GetCellOutput` | Get the latest cell output | `hex cell get --with-output` | Yes | Yes |
+| Cells | `CreateCell` | Create a cell | `hex cell create` | No | Yes |
+| Cells | `ListCells` | List project cells | `hex cell list` | Yes | Yes |
+| Projects | `ExportProject` | Export a project | `hex project export` | Yes | Yes |
+| Cells | `GetChartImageFromRun` | Get a chart image from a completed run | No direct command | Yes | Yes |
+| Threads | `CreateThread` | Create an agent thread | No | No | Yes |
+| Threads | `ListThreads` | List agent threads | `hex thread list` | Yes | Yes |
+| Threads | `GetThread` | Get thread status and response | `hex thread get` | Yes | Yes |
+| Threads | `GetThreadMessages` | List thread messages | `hex thread messages` | Yes | Yes |
+| Threads | `ContinueThread` | Continue a thread | No | No | Yes |
+| Users | `Me` | Get the authenticated user | Partial: `hex auth status` | Yes | Yes |
+| Users | `ListUsers` | List workspace users | `hex user list` | Yes | Yes |
+| Users | `DeactivateUser` | Deactivate a user | No | No | Yes |
+| Context | `ListTopics` | List context topics | `hex context topic list` | Yes | Yes |
+| Guides | `ListDraftGuides` | List draft guides | No | Yes | Yes |
 
 ## Coverage summary
 
-| Surface | Full | Partial | Missing | Baseline support |
-| --- | ---: | ---: | ---: | ---: |
-| Official CLI 1.2026.07.21 | 15 | 2 | 9 | 17 of 26 have at least partial coverage |
-| Hex public API | 25 direct | 1 composed | 0 | 26 of 26 |
-| Proposed parity release | 26 planned | 0 | 0 | 26 of 26 |
+| Surface | Operations available |
+| --- | ---: |
+| Official Hex public API | 52 |
+| MCP `read-only` mode | 24 |
+| MCP `full` mode | 52 |
 
-The official [Hex MCP server](https://learn.hex.tech/docs/api-integrations/mcp-server) is a different product surface. It currently exposes four tools—project search plus create, get, and continue Thread operations—and does not provide this administration and orchestration parity set.
+The official [Hex MCP server](https://learn.hex.tech/docs/api-integrations/mcp-server) currently exposes four tools focused on project search and agent Threads. This project instead exposes the official public API as a curated MCP surface.
 
-## CLI-only and newer API opportunities
+## Generation approach
 
-These are deliberately outside the first parity release but should be evaluated immediately afterwards:
-
-- Create, update, export, import, and open projects.
-- Get, create, delete, and run cells; retrieve cell output and chart images.
-- Draft project runs in addition to published app runs.
-- Threads, users, guides, context topics, suggestions, semantic projects, queried-table observability, and embedded URLs.
-- Data connection schema refresh.
-
-Unstable endpoints, including cell output, should remain opt-in until their compatibility policy is defined.
-
-## Client reuse finding
-
-- The official [`hex-inc/hex-cli`](https://github.com/hex-inc/hex-cli) repository contains only a README and a [proprietary license](https://github.com/hex-inc/hex-cli/blob/main/LICENSE). It publishes binaries, not source or a reusable API-client package.
-- Depending on the CLI executable would add a proprietary, macOS/Linux-only runtime dependency and still leave nine parity capabilities unavailable. It is therefore useful as an interoperability oracle, not as the MCP transport layer.
-- Hex publishes a downloadable [OpenAPI specification](https://static.hex.site/openapi.json), but its metadata says `UNLICENSED`. We should use the public reference as documentation and write a small client around standard HTTP. We should not vendor the specification or commit generated derivatives unless Hex clarifies its license.
-- The unofficial [`hex-api` package on PyPI](https://pypi.org/project/hex-api/) has one release from May 2025, points to a placeholder GitHub repository, and is maintained by the abandoned MCP's author. It is not a suitable production dependency even though its package metadata says MIT.
+- FastMCP's OpenAPI provider builds tools from the official operation IDs and schemas.
+- Tool names are stable snake-case forms of official operation IDs.
+- `read-only` mode includes GET operations plus `ExportProject`, which is a non-mutating POST operation.
+- `full` mode includes every operation returned by the official specification.
+- Operation metadata is transformed to add MCP read-only, destructive, and idempotency annotations.
+- Unknown future non-GET operations never appear in `read-only` mode.

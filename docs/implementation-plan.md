@@ -2,75 +2,69 @@
 
 ## Outcome
 
-Ship a clean-room MIT-licensed MCP server that implements all 26 capabilities in the [capability matrix](capability-matrix.md), without depending on the AGPL server or proprietary Hex CLI.
+Ship an MIT-licensed Python MCP server that exposes Hex's complete official public API through FastMCP's OpenAPI provider.
 
-The parity release will keep the documented tool names so existing client prompts and configurations can migrate with minimal change. Behavior and schemas will be defined from Hex's public API documentation rather than copied from the abandoned implementation.
+The official OpenAPI specification is the only capability source of truth. Tool names and schemas are derived from its operation IDs and request definitions.
 
 ## Architecture
 
-- TypeScript on the current Node.js LTS line, managed with Yarn.
-- Official Model Context Protocol TypeScript SDK and Zod for strict input and output schemas.
-- A small asynchronous `HexClient` using standard `fetch`, bearer authentication, configurable base URL, request timeouts, safe error mapping, and cursor pagination helpers.
-- Domain modules for projects, runs, cells, sharing, collections, groups, and connections, following the same separation of client/config/server/tools used by [Airbyte MCP](https://github.com/blstrco/airbyte/tree/main/airbyte/airbyte-mcp) without copying its implementation.
-- Stdio transport for local clients and Streamable HTTP for self-hosting. The first HTTP release will support caller-supplied Hex bearer tokens and a server token fallback; a full OAuth gateway is a separate design because it requires an authorization model and Hex client registration.
-- Structured JSON results with concise text summaries, MCP tool annotations for read-only, destructive, and idempotent behavior, and explicit pagination cursors.
+- Python 3.12 or newer, packaged and locked with `uv`.
+- FastMCP 3.x with `OpenAPIProvider` for dynamic tool generation.
+- `httpx.AsyncClient` for authenticated calls to the Hex API.
+- Pydantic settings for environment validation.
+- Stdio and Streamable HTTP transports.
+- Structured API responses with MCP annotations derived from HTTP semantics and an explicit safety classification.
 
-## Clean-room and dependency rules
+## Capability modes
 
-- Do not copy or translate code, tests, docstrings, examples, or generated artifacts from `franccesco/hex-mcp`.
-- Do not shell out to the Hex CLI or read its private credential store.
-- Do not vendor the currently unlicensed Hex OpenAPI file or generated code derived from it.
-- Implement requests from the official API reference and validate behavior with independently written contract fixtures.
-- Record source URLs and research dates when an endpoint contract is added or changed.
+`HEX_MCP_MODE` controls which tools are registered:
+
+- `read-only` is the default. It exposes the 23 GET operations plus the non-mutating `ExportProject` operation. Write tools do not exist in the MCP catalog and cannot be called by name.
+- `full` exposes all 52 operations currently present in the official specification.
+
+Hex token permissions are still enforced by Hex, but they are not used to decide which tools exist. A highly privileged token running in `read-only` mode remains limited to the read-only catalog.
+
+## OpenAPI handling
+
+- Load the specification from `https://static.hex.site/openapi.json` at startup by default.
+- Support an explicitly configured local specification for reproducible or offline deployments.
+- Do not commit the Hex specification into this repository.
+- Validate that every generated tool has an `operationId`, unique name, request schema, and response definition.
+- Log the specification version and content digest at startup so deployments can identify the exact contract they loaded.
 
 ## Authentication and security
 
-- Support `HEX_API_TOKEN` and `HEX_API_BASE_URL`, defaulting to `https://app.hex.tech/api/v1`.
-- Never log authorization headers, connection credentials, or mutation request bodies containing secrets.
-- Return Hex status, reason, and trace ID in errors without returning credentials or internal stack traces.
-- Respect `Retry-After` on rate limits. Retry safe reads only; do not automatically retry non-idempotent creates.
-- Mark cancellation, deletion, permission changes, and connection mutations accurately with MCP annotations.
-- Redact known credential fields from connection responses and add regression tests for secret leakage.
+- Support `HEX_API_TOKEN` and `HEX_API_BASE_URL`.
+- Never log authorization headers, connection credentials, or secret-bearing request bodies.
+- Return Hex status, reason, and trace ID without returning internal stack traces.
+- Respect `Retry-After` for safe reads. Do not automatically retry non-idempotent writes.
+- Mark DELETE operations and user deactivation as destructive.
+- Redact known credential fields from data connection responses.
+- Refuse to start for an unknown `HEX_MCP_MODE` value.
 
 ## Delivery sequence
 
-Each implementation pull request starts from the latest `main`, is independently reviewable, and includes its own tests and documentation.
+| Pull request | Scope | Estimate |
+| --- | --- | ---: |
+| 1. Planning | Official API/CLI matrix, architecture, and capability-mode policy | Complete |
+| 2. Generated server | Package, OpenAPI provider, auth, both modes, transports, and all generated operations | 2–3 days |
+| 3. Hardening | Tool transformations, annotations, redaction, error mapping, contract tests, and packaging | 2–3 days |
+| 4. Release | Live test-workspace verification, installation docs, CI, and `v0.1.0` | 1–2 days |
 
-| Pull request | Scope | Tools delivered | Estimate |
-| --- | --- | ---: | ---: |
-| 0. Foundation | Package, config, HTTP client, safe errors, pagination, stdio/HTTP entry points, test harness, and CI | 0 | 1–2 days |
-| 1. Read-only surface | Projects, run history/status, cells, collections, groups, and connections | 12 | 2–3 days |
-| 2. Execution and cell mutation | Trigger/cancel runs and update cells | 3 | 1–2 days |
-| 3. Project sharing | User, group, collection, workspace, and public access changes | 4 | 1–2 days |
-| 4. Collections and groups | Collection create/update and group create/update/delete | 5 | 1–2 days |
-| 5. Data connection writes | Create/update connections with secret-safe schemas and fixtures | 2 | 2 days |
-| 6. Release hardening | Live sandbox smoke suite, packaging, install docs, compatibility report, and `v0.1.0` | 0 | 1 day |
+## Verification
 
-Expected total: 9–14 engineering days, depending mainly on access to a safe Hex test workspace and representative credentials for each supported connection type.
+- Unit tests for configuration, specification loading, operation classification, mode filtering, naming, and secret redaction.
+- Contract tests using independently written minimal OpenAPI fixtures.
+- MCP tests asserting exactly 24 tools in `read-only` mode and 52 tools in `full` mode for the current official specification.
+- MCP Inspector smoke tests for stdio and Streamable HTTP.
+- Live sandbox tests covering every API area, gated by explicit test-only credentials.
+- Linting, formatting, type checking, and tests through `uv` scripts.
 
-## Verification per pull request
+## Release acceptance criteria
 
-- Unit tests for validation, pagination, error mapping, rate limiting, and secret redaction.
-- Mocked HTTP contract tests for every endpoint and meaningful response variant.
-- MCP registration tests that assert tool name, schema, annotations, and structured output.
-- Type checking, linting, formatting checks, and all tests through Yarn scripts.
-- MCP Inspector smoke test for both stdio and Streamable HTTP transports.
-- Optional live tests gated by explicit test-only environment variables; CI never receives production credentials.
-
-## Parity release acceptance criteria
-
-- All 26 matrix tools are registered and documented.
-- Each tool has success, authentication failure, permission failure, not-found, rate-limit, and representative validation coverage where applicable.
-- A sandbox workspace smoke test covers at least one successful operation in every domain and cleans up objects it creates.
-- No AGPL or proprietary code or artifacts are present in the repository.
-- No token or connection secret appears in logs, errors, snapshots, or MCP responses.
-- The package can be installed and launched from a fresh checkout using the documented Yarn commands.
-
-## Decisions needed before implementation
-
-- Confirm that `v0.1.0` should preserve the 26 legacy tool names rather than adopt new names.
-- Provide or approve creation of a non-production Hex workspace for live integration testing.
-- Decide whether Streamable HTTP with bearer-token forwarding is required in `v0.1.0` or can follow the stdio release.
-- Decide whether connection creation/update should ship in the general server or behind an explicit opt-in because those tools handle database credentials.
-
-After parity, plan a separate `v0.2` matrix for the newer public API and CLI capabilities instead of expanding the first release mid-implementation.
+- The full catalog matches every operation in the official specification.
+- The read-only catalog contains no mutating operation.
+- Generated names are deterministic and unique.
+- Sensitive values never appear in logs, errors, snapshots, or MCP responses.
+- The server runs from a fresh checkout through both supported transports.
+- The repository contains no vendored Hex specification or proprietary CLI artifact.
