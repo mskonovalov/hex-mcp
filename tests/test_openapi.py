@@ -8,6 +8,7 @@ import pytest
 
 from hex_mcp.openapi import (
     load_openapi,
+    normalize_openapi,
     operation_names,
     to_snake_case,
     validate_openapi,
@@ -47,6 +48,26 @@ def test_builds_names_from_operation_ids(openapi_document: dict[str, Any]) -> No
         "UpdateProject": "update_project",
         "DeleteProject": "delete_project",
     }
+
+
+def test_normalizes_hex_semantic_route(openapi_document: dict[str, Any]) -> None:
+    operation = {
+        "post": {
+            "operationId": "IngestSemanticProject",
+            "responses": {"201": {"description": "Ingested"}},
+        }
+    }
+    openapi_document["paths"][
+        "/v1/semantic-(projects|models)/{semanticProjectId}/ingest"
+    ] = operation
+
+    normalized = normalize_openapi(openapi_document)
+
+    assert (
+        normalized["paths"]["/v1/semantic-projects/{semanticProjectId}/ingest"]
+        == operation
+    )
+    assert not any("(projects|models)" in path for path in normalized["paths"])
 
 
 def test_rejects_missing_operation_id(openapi_document: dict[str, Any]) -> None:

@@ -24,7 +24,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    api_token: SecretStr
+    api_token: SecretStr = Field(min_length=1)
     api_base_url: str = "https://app.hex.tech/api"
     openapi_spec: str = "https://static.hex.site/openapi.json"
     mcp_mode: MCPMode = MCPMode.READ_ONLY

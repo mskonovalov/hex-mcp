@@ -48,7 +48,7 @@ Hex token permissions are still enforced by Hex, but they are not used to decide
 | --- | --- | ---: |
 | 1. Planning | Official API/CLI matrix, architecture, and capability-mode policy | Complete |
 | 2. Generated server | Package, OpenAPI provider, auth, both modes, transports, and all generated operations | Complete |
-| 3. Hardening | Tool transformations, annotations, redaction, error mapping, contract tests, and packaging | 2–3 days |
+| 3. Hardening | Tool transformations, annotations, redaction, error mapping, contract tests, and packaging | Complete |
 | 4. Release | Live test-workspace verification, installation docs, CI, and `v0.1.0` | 1–2 days |
 
 ## Verification

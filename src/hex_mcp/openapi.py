@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,9 @@ from urllib.parse import urlparse
 import httpx
 
 HTTP_METHODS = frozenset({"delete", "get", "patch", "post", "put"})
+SEMANTIC_ROUTE_PATTERN = "/v1/semantic-(projects|models)"
+SEMANTIC_ROUTE_CANONICAL = "/v1/semantic-projects"
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -34,8 +38,9 @@ async def load_openapi(source: str, timeout_seconds: float = 30.0) -> LoadedOpen
     if not isinstance(document, dict):
         raise ValueError("OpenAPI document must be a JSON object")
 
-    validate_openapi(document)
     canonical = json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
+    document = normalize_openapi(document)
+    validate_openapi(document)
     info = document.get("info", {})
     version = info.get("version", "unknown") if isinstance(info, dict) else "unknown"
     return LoadedOpenAPI(
@@ -44,6 +49,39 @@ async def load_openapi(source: str, timeout_seconds: float = 30.0) -> LoadedOpen
         version=str(version),
         digest=hashlib.sha256(canonical).hexdigest(),
     )
+
+
+def normalize_openapi(document: dict[str, Any]) -> dict[str, Any]:
+    paths = document.get("paths")
+    if not isinstance(paths, dict):
+        return document
+
+    matching_paths = [
+        path
+        for path in paths
+        if isinstance(path, str) and SEMANTIC_ROUTE_PATTERN in path
+    ]
+    if not matching_paths:
+        return document
+
+    normalized_paths = dict(paths)
+    for path in matching_paths:
+        canonical_path = path.replace(
+            SEMANTIC_ROUTE_PATTERN,
+            SEMANTIC_ROUTE_CANONICAL,
+        )
+        if canonical_path in normalized_paths:
+            raise ValueError(f"Duplicate normalized OpenAPI path: {canonical_path}")
+        normalized_paths[canonical_path] = normalized_paths.pop(path)
+
+    # Hex publishes backend route alternation as a literal OpenAPI path, which
+    # returns 404. Both expanded routes exist; semantic-projects is current naming.
+    LOGGER.warning(
+        "Normalized %d Hex semantic OpenAPI path(s) to %s",
+        len(matching_paths),
+        SEMANTIC_ROUTE_CANONICAL,
+    )
+    return {**document, "paths": normalized_paths}
 
 
 def validate_openapi(document: dict[str, Any]) -> None:

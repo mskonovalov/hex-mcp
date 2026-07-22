@@ -13,6 +13,7 @@ authors = [{ name = "Mikhail Konovalov" }]
 dependencies = [
     "fastmcp>=3.4,<4",
     "httpx>=0.28,<1",
+    "httpx-retries>=0.6,<1",
     "pydantic-settings>=2.10,<3",
 ]
 
