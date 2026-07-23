@@ -12,7 +12,11 @@ from pydantic import SecretStr
 
 import hex_mcp.server as server_module
 from hex_mcp.config import MCPMode, Settings, Transport
-from hex_mcp.openapi import LoadedOpenAPI, normalize_hex_openapi
+from hex_mcp.openapi import (
+    PROJECT_ID_INPUT_SCHEMA,
+    LoadedOpenAPI,
+    normalize_hex_openapi,
+)
 from hex_mcp.server import (
     ServerBundle,
     build_server,
@@ -63,6 +67,63 @@ async def test_api_client_uses_bearer_token(loaded_openapi: LoadedOpenAPI) -> No
     bundle = build_server(settings(MCPMode.READ_ONLY), loaded_openapi)
     try:
         assert bundle.api_client.headers["Authorization"] == "Bearer test-token"
+    finally:
+        await bundle.api_client.aclose()
+
+
+async def test_generated_project_id_requires_uuid() -> None:
+    document = {
+        "openapi": "3.0.3",
+        "info": {"title": "Hex test API", "version": "test"},
+        "servers": [{"url": "https://app.hex.tech/api"}],
+        "paths": {
+            "/v1/cells": {
+                "get": {
+                    "operationId": "ListCells",
+                    "parameters": [
+                        {
+                            "name": "projectId",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "string"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "Cells"}},
+                }
+            }
+        },
+    }
+    loaded = LoadedOpenAPI(
+        document=normalize_hex_openapi(document),
+        source="test-openapi.json",
+        version="test",
+        digest="test-digest",
+    )
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={})
+
+    bundle = build_server(
+        settings(MCPMode.READ_ONLY),
+        loaded,
+        api_transport=httpx.MockTransport(handler),
+    )
+    try:
+        tool = await bundle.provider.get_tool("list_cells")
+        assert tool is not None
+        assert tool.parameters["properties"]["projectId"] == PROJECT_ID_INPUT_SCHEMA
+        async with Client(bundle.server) as client:
+            result = await client.call_tool(
+                "list_cells",
+                {"projectId": "033qADkKFIi4rt3feMxx3C"},
+                raise_on_error=False,
+            )
+        assert result.is_error is True
+        assert "Input validation error" in str(result)
+        assert PROJECT_ID_INPUT_SCHEMA["pattern"] in str(result)
+        assert requests == []
     finally:
         await bundle.api_client.aclose()
 

@@ -129,6 +129,7 @@ def build_server(
         lifespan=lifespan,
         transforms=[HardenedToolTransform()],
         mask_error_details=True,
+        strict_input_validation=True,
     )
     return ServerBundle(
         server=server,

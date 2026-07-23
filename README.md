@@ -103,6 +103,8 @@ The repository does not vendor Hex's specification. Contract behavior can be tes
 
 Hex's specification currently publishes two semantic paths with backend regex syntax as literal OpenAPI paths. Those literals return `404`, while both expanded routes exist. The loader normalizes them to the current `/v1/semantic-projects/...` naming before generating tools while retaining the original specification digest for observability.
 
+The specification also applies its UUID-based `ProjectId` schema inconsistently. The loader normalizes all `projectId` inputs to the UUID contract so compact IDs from `/app/` URLs are rejected before a Hex API request.
+
 Streamable HTTP currently uses the single server-wide `HEX_API_TOKEN` and has no inbound client authentication. Keep the default loopback bind unless access is protected by a trusted authentication proxy.
 
 ## Design documents

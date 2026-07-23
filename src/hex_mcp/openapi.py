@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,17 @@ HEX_PATH_REPLACEMENTS = {
     ),
     "/v1/semantic-(projects|models)/{semanticProjectId}/ingest": (
         "/v1/semantic-projects/{semanticProjectId}/ingest"
+    ),
+}
+PROJECT_ID_INPUT_SCHEMA = {
+    "type": "string",
+    "format": "uuid",
+    "pattern": (
+        "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    ),
+    "description": (
+        "Hex project UUID in canonical 8-4-4-4-12 format. The compact ID in "
+        "an /app/ URL is not a valid projectId."
     ),
 }
 LOGGER = logging.getLogger(__name__)
@@ -58,7 +70,15 @@ async def load_openapi(source: str, timeout_seconds: float = 30.0) -> LoadedOpen
 
 
 def normalize_hex_openapi(document: dict[str, Any]) -> dict[str, Any]:
-    """Correct two regex-style path keys published in Hex's OpenAPI document.
+    """Correct known inconsistencies in Hex's published OpenAPI document."""
+    normalized = deepcopy(document)
+    _normalize_hex_semantic_paths(normalized)
+    _normalize_project_id_inputs(normalized)
+    return normalized
+
+
+def _normalize_hex_semantic_paths(document: dict[str, Any]) -> None:
+    """Replace regex-style semantic path keys with valid OpenAPI paths.
 
     IngestSemanticProject and UpdateSemanticProject use ``(projects|models)``
     inside their path keys. OpenAPI treats that text literally, so FastMCP sends
@@ -68,11 +88,11 @@ def normalize_hex_openapi(document: dict[str, Any]) -> dict[str, Any]:
     """
     paths = document.get("paths")
     if not isinstance(paths, dict):
-        return document
+        return
 
     matching_paths = set(paths).intersection(HEX_PATH_REPLACEMENTS)
     if not matching_paths:
-        return document
+        return
 
     normalized_paths = {
         HEX_PATH_REPLACEMENTS.get(path, path): path_item
@@ -81,11 +101,79 @@ def normalize_hex_openapi(document: dict[str, Any]) -> dict[str, Any]:
     if len(normalized_paths) != len(paths):
         raise ValueError("Hex semantic path normalization would overwrite a path")
 
+    document["paths"] = normalized_paths
     LOGGER.warning(
         "Normalized %d malformed Hex semantic OpenAPI path(s)",
         len(matching_paths),
     )
-    return {**document, "paths": normalized_paths}
+
+
+def _normalize_project_id_inputs(document: dict[str, Any]) -> None:
+    """Apply Hex's canonical UUID schema to every projectId input.
+
+    Hex defines a strict ProjectId UUID schema but leaves several projectId
+    inputs as unconstrained strings. Those inputs are normalized to the UUID
+    contract so invalid compact app URL IDs fail before an API request is sent.
+    """
+    paths = document.get("paths")
+    if not isinstance(paths, dict):
+        return
+
+    project_id_inputs = 0
+    for path_item in paths.values():
+        if not isinstance(path_item, dict):
+            continue
+
+        parameter_owners = [path_item]
+        parameter_owners.extend(
+            operation
+            for method, operation in path_item.items()
+            if method.lower() in HTTP_METHODS and isinstance(operation, dict)
+        )
+        for owner in parameter_owners:
+            parameters = owner.get("parameters")
+            if not isinstance(parameters, list):
+                continue
+            for parameter in parameters:
+                if (
+                    not isinstance(parameter, dict)
+                    or parameter.get("name") != "projectId"
+                ):
+                    continue
+                parameter["description"] = PROJECT_ID_INPUT_SCHEMA["description"]
+                parameter["schema"] = dict(PROJECT_ID_INPUT_SCHEMA)
+                project_id_inputs += 1
+
+        for method, operation in path_item.items():
+            if method.lower() not in HTTP_METHODS or not isinstance(operation, dict):
+                continue
+            content = operation.get("requestBody", {}).get("content", {})
+            if not isinstance(content, dict):
+                continue
+            for media_type in content.values():
+                if not isinstance(media_type, dict):
+                    continue
+                schema = media_type.get("schema")
+                if not isinstance(schema, dict):
+                    continue
+                properties = schema.get("properties")
+                if not isinstance(properties, dict):
+                    continue
+                project_id = properties.get("projectId")
+                if not isinstance(project_id, dict):
+                    continue
+                properties["projectId"] = {
+                    **project_id,
+                    **PROJECT_ID_INPUT_SCHEMA,
+                }
+                properties["projectId"].pop("$ref", None)
+                project_id_inputs += 1
+
+    if project_id_inputs:
+        LOGGER.warning(
+            "Normalized %d Hex projectId input schema(s) to UUIDs",
+            project_id_inputs,
+        )
 
 
 def validate_openapi(document: dict[str, Any]) -> None:

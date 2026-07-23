@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from hex_mcp.openapi import (
+    PROJECT_ID_INPUT_SCHEMA,
     load_openapi,
     normalize_hex_openapi,
     operation_names,
@@ -23,7 +24,7 @@ async def test_loads_local_openapi(
 
     loaded = await load_openapi(str(source))
 
-    assert loaded.document == openapi_document
+    assert loaded.document == normalize_hex_openapi(openapi_document)
     assert loaded.version == "test"
     assert len(loaded.digest) == 64
 
@@ -68,6 +69,55 @@ def test_normalizes_hex_semantic_route(openapi_document: dict[str, Any]) -> None
         == operation
     )
     assert not any("(projects|models)" in path for path in normalized["paths"])
+
+
+def test_normalizes_project_id_inputs(openapi_document: dict[str, Any]) -> None:
+    openapi_document["paths"]["/v1/cells"] = {
+        "get": {
+            "operationId": "ListCells",
+            "parameters": [
+                {
+                    "name": "projectId",
+                    "in": "query",
+                    "required": True,
+                    "schema": {"type": "string"},
+                }
+            ],
+            "responses": {"200": {"description": "Cells"}},
+        },
+        "post": {
+            "operationId": "CreateCell",
+            "requestBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "projectId": {
+                                    "type": "string",
+                                    "nullable": True,
+                                }
+                            },
+                        }
+                    }
+                }
+            },
+            "responses": {"201": {"description": "Cell"}},
+        },
+    }
+
+    normalized = normalize_hex_openapi(openapi_document)
+
+    list_parameter = normalized["paths"]["/v1/cells"]["get"]["parameters"][0]
+    create_property = normalized["paths"]["/v1/cells"]["post"]["requestBody"][
+        "content"
+    ]["application/json"]["schema"]["properties"]["projectId"]
+    assert list_parameter["description"] == PROJECT_ID_INPUT_SCHEMA["description"]
+    assert list_parameter["schema"] == PROJECT_ID_INPUT_SCHEMA
+    assert create_property == {**PROJECT_ID_INPUT_SCHEMA, "nullable": True}
+    assert openapi_document["paths"]["/v1/cells"]["get"]["parameters"][0]["schema"] == {
+        "type": "string"
+    }
 
 
 def test_rejects_missing_operation_id(openapi_document: dict[str, Any]) -> None:
