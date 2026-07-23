@@ -70,40 +70,57 @@ async def load_openapi(source: str, timeout_seconds: float = 30.0) -> LoadedOpen
 
 
 def normalize_hex_openapi(document: dict[str, Any]) -> dict[str, Any]:
-    """Correct known inconsistencies in Hex's published OpenAPI document.
+    """Correct known inconsistencies in Hex's published OpenAPI document."""
+    normalized = deepcopy(document)
+    _normalize_hex_semantic_paths(normalized)
+    _normalize_project_id_inputs(normalized)
+    return normalized
+
+
+def _normalize_hex_semantic_paths(document: dict[str, Any]) -> None:
+    """Replace regex-style semantic path keys with valid OpenAPI paths.
 
     IngestSemanticProject and UpdateSemanticProject use ``(projects|models)``
     inside their path keys. OpenAPI treats that text literally, so FastMCP sends
     requests to a route that Hex returns as 404. Hex recognizes both expanded
     aliases; ``semantic-projects`` matches the current operation and parameter
     naming, so the two exact keys are replaced before FastMCP parses the document.
+    """
+    paths = document.get("paths")
+    if not isinstance(paths, dict):
+        return
 
-    Hex also defines a strict ProjectId UUID schema but leaves several projectId
+    matching_paths = set(paths).intersection(HEX_PATH_REPLACEMENTS)
+    if not matching_paths:
+        return
+
+    normalized_paths = {
+        HEX_PATH_REPLACEMENTS.get(path, path): path_item
+        for path, path_item in paths.items()
+    }
+    if len(normalized_paths) != len(paths):
+        raise ValueError("Hex semantic path normalization would overwrite a path")
+
+    document["paths"] = normalized_paths
+    LOGGER.warning(
+        "Normalized %d malformed Hex semantic OpenAPI path(s)",
+        len(matching_paths),
+    )
+
+
+def _normalize_project_id_inputs(document: dict[str, Any]) -> None:
+    """Apply Hex's canonical UUID schema to every projectId input.
+
+    Hex defines a strict ProjectId UUID schema but leaves several projectId
     inputs as unconstrained strings. Those inputs are normalized to the UUID
     contract so invalid compact app URL IDs fail before an API request is sent.
     """
     paths = document.get("paths")
     if not isinstance(paths, dict):
-        return document
-
-    normalized = deepcopy(document)
-    normalized_paths = normalized["paths"]
-    matching_paths = set(paths).intersection(HEX_PATH_REPLACEMENTS)
-    if matching_paths:
-        normalized_paths = {
-            HEX_PATH_REPLACEMENTS.get(path, path): path_item
-            for path, path_item in normalized_paths.items()
-        }
-        if len(normalized_paths) != len(paths):
-            raise ValueError("Hex semantic path normalization would overwrite a path")
-        normalized["paths"] = normalized_paths
-        LOGGER.warning(
-            "Normalized %d malformed Hex semantic OpenAPI path(s)",
-            len(matching_paths),
-        )
+        return
 
     project_id_inputs = 0
-    for path_item in normalized_paths.values():
+    for path_item in paths.values():
         if not isinstance(path_item, dict):
             continue
 
@@ -157,7 +174,6 @@ def normalize_hex_openapi(document: dict[str, Any]) -> dict[str, Any]:
             "Normalized %d Hex projectId input schema(s) to UUIDs",
             project_id_inputs,
         )
-    return normalized
 
 
 def validate_openapi(document: dict[str, Any]) -> None:
