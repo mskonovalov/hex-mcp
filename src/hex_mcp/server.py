@@ -7,6 +7,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import Annotated
 
 import httpx
 from fastmcp import FastMCP
@@ -19,10 +20,17 @@ from fastmcp.server.providers.openapi.components import (
 from fastmcp.utilities.openapi.models import HTTPRoute
 from httpx_retries import Retry, RetryTransport
 from mcp.types import ToolAnnotations
+from pydantic import Field
 
 from hex_mcp import __version__
 from hex_mcp.config import MCPMode, Settings, Transport
 from hex_mcp.openapi import LoadedOpenAPI, load_openapi, operation_names
+from hex_mcp.project_urls import (
+    ProjectUrlResolution,
+)
+from hex_mcp.project_urls import (
+    resolve_project_url as resolve_project_url_reference,
+)
 from hex_mcp.tool_safety import HardenedToolTransform
 
 LOGGER = logging.getLogger(__name__)
@@ -123,6 +131,8 @@ def build_server(
         name="Hex",
         instructions=(
             "Tools are generated from Hex's official OpenAPI specification. "
+            "projectId inputs require UUIDs; call resolve_project_url first "
+            "when the user provides a Hex URL. "
             f"Capability mode: {settings.mcp_mode.value}."
         ),
         providers=[provider],
@@ -131,6 +141,36 @@ def build_server(
         mask_error_details=True,
         strict_input_validation=True,
     )
+
+    @server.tool(
+        name="resolve_project_url",
+        description=(
+            "Convert a Hex project or app URL into the project UUID required by "
+            "projectId inputs. App URL compact IDs are not project UUIDs, so this "
+            "tool matches the URL title against all projects accessible to the "
+            "configured Hex token and returns candidates instead of guessing when "
+            "titles are ambiguous."
+        ),
+        tags={"read-only"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=True,
+        ),
+    )
+    async def resolve_project_url(
+        url: Annotated[
+            str,
+            Field(
+                description=(
+                    "A Hex URL containing /hex/<uuid>/ or /app/<title>-<compact-id>/."
+                )
+            ),
+        ],
+    ) -> ProjectUrlResolution:
+        return await resolve_project_url_reference(url, api_client)
+
     return ServerBundle(
         server=server,
         provider=provider,

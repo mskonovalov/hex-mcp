@@ -19,7 +19,7 @@ The pending publisher does not reserve the project name. Complete this setup imm
 - CI passes from a fresh locked environment.
 - The wheel and source distribution both pass `tests/smoke_test.py`.
 - The stdio and Streamable HTTP transports start from the built package.
-- A Hex test workspace exposes exactly 24 tools in `read-only` mode and 52 tools in `full` mode.
+- A Hex test workspace exposes exactly 25 tools in `read-only` mode and 53 tools in `full` mode.
 - Representative read operations succeed across projects, runs, users, data connections, and semantic projects.
 - Write and destructive operations are exercised only against disposable test-workspace resources.
 - Logs and MCP results contain no token or connection credential values.
@@ -29,8 +29,9 @@ The pending publisher does not reserve the project name. Complete this setup imm
 The release workflow requires the tag to match the version in `pyproject.toml`. From an up-to-date `main` branch:
 
 ```bash
-git tag -a v0.1.0 -m v0.1.0
-git push origin v0.1.0
+VERSION="$(uv version --short)"
+git tag -a "v${VERSION}" -m "v${VERSION}"
+git push origin "v${VERSION}"
 ```
 
 The tag builds and smoke-tests both distributions before publishing them to PyPI through trusted publishing.

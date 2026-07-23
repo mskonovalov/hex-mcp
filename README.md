@@ -2,7 +2,7 @@
 
 An MIT-licensed MCP server generated from the official Hex public API specification.
 
-The server loads Hex's current OpenAPI document at startup and exposes its operations as deterministic, snake_case MCP tools through FastMCP.
+The server loads Hex's current OpenAPI document at startup and exposes its operations as deterministic, snake_case MCP tools through FastMCP. It also provides a read-only helper that resolves Hex project URLs to the UUIDs required by the API.
 
 The PyPI distribution and installed command are named `hex-openapi-mcp`. The shorter `hex-mcp` command remains available, and the Python import is `hex_mcp`.
 
@@ -12,6 +12,8 @@ The PyPI distribution and installed command are named `hex-openapi-mcp`. The sho
 - `full` exposes the complete official API surface.
 
 `read-only` is the default. It registers GET operations and the non-mutating `export_project` POST operation. Mutating tools do not exist in the MCP catalog in this mode, even when `HEX_API_TOKEN` has write permissions.
+
+Both modes expose `resolve_project_url`. Agents should call it before tools requiring `projectId` when the user provides a Hex URL. Direct `/hex/<uuid>/` URLs are parsed locally. For `/app/` URLs, the compact suffix is not the API project ID, so the helper paginates through accessible projects and matches the normalized title. Duplicate titles are returned as candidates instead of being guessed.
 
 ## Install
 
@@ -96,7 +98,7 @@ The repository does not vendor Hex's specification. Contract behavior can be tes
 
 ## Safety and reliability
 
-- Every tool has MCP read-only, destructive, idempotent, and open-world annotations derived from its official operation and HTTP method.
+- Generated API tools have MCP read-only, destructive, idempotent, and open-world annotations derived from their official operation and HTTP method. The project URL resolver is explicitly marked read-only and idempotent.
 - Tool results and Hex error bodies recursively redact known credential fields and Hex bearer tokens before they reach MCP output or error logging.
 - Hex HTTP errors preserve the status, reason, and trace ID in a structured MCP error without exposing internal stack traces.
 - GET requests retry transient `429`, `502`, `503`, and `504` responses up to twice, respect `Retry-After`, and use bounded exponential backoff. Write requests are never retried automatically.

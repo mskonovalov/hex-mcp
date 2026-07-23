@@ -2,9 +2,9 @@
 
 ## Outcome
 
-Ship an MIT-licensed Python MCP server that exposes Hex's complete official public API through FastMCP's OpenAPI provider.
+Ship an MIT-licensed Python MCP server that exposes Hex's complete official public API through FastMCP's OpenAPI provider and adds narrowly scoped helpers for agent usability.
 
-The official OpenAPI specification is the only capability source of truth. Tool names and schemas are derived from its operation IDs and request definitions.
+The official OpenAPI specification is the source of truth for API capabilities. Generated tool names and schemas are derived from its operation IDs and request definitions.
 
 ## Architecture
 
@@ -19,8 +19,8 @@ The official OpenAPI specification is the only capability source of truth. Tool 
 
 `HEX_MCP_MODE` controls which tools are registered:
 
-- `read-only` is the default. It exposes the 23 GET operations plus the non-mutating `ExportProject` operation. Write tools do not exist in the MCP catalog and cannot be called by name.
-- `full` exposes all 52 operations currently present in the official specification.
+- `read-only` is the default. It exposes the 23 GET operations, the non-mutating `ExportProject` operation, and the read-only project URL resolver. Write tools do not exist in the MCP catalog and cannot be called by name.
+- `full` exposes all 52 operations currently present in the official specification plus the project URL resolver.
 
 Hex token permissions are still enforced by Hex, but they are not used to decide which tools exist. A highly privileged token running in `read-only` mode remains limited to the read-only catalog.
 
@@ -55,7 +55,7 @@ Hex token permissions are still enforced by Hex, but they are not used to decide
 
 - Unit tests for configuration, specification loading, operation classification, mode filtering, naming, and secret redaction.
 - Contract tests using independently written minimal OpenAPI fixtures.
-- MCP tests asserting exactly 24 tools in `read-only` mode and 52 tools in `full` mode for the current official specification.
+- MCP tests asserting exactly 25 tools in `read-only` mode and 53 tools in `full` mode for the current official specification.
 - MCP Inspector smoke tests for stdio and Streamable HTTP.
 - Live sandbox tests covering every API area, gated by explicit test-only credentials.
 - Linting, formatting, type checking, and tests through `uv` scripts.

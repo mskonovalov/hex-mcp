@@ -8,6 +8,7 @@ The source of truth is Hex's official [OpenAPI specification](https://static.hex
 
 | Area | Official operation | Capability | Official CLI | Read-only | Full |
 | --- | --- | --- | --- | --- | --- |
+| Projects | MCP helper: `resolve_project_url` | Resolve a Hex project URL to an API project UUID | No | Yes | Yes |
 | Embedding | `CreatePresignedUrl` | Create an embedded app URL | No | No | Yes |
 | Projects | `CreateProject` | Create a project | `hex project create` | No | Yes |
 | Projects | `ListProjects` | List projects | `hex project list` | Yes | Yes |
@@ -66,14 +67,15 @@ The source of truth is Hex's official [OpenAPI specification](https://static.hex
 | Surface | Operations available |
 | --- | ---: |
 | Official Hex public API | 52 |
-| MCP `read-only` mode | 24 |
-| MCP `full` mode | 52 |
+| MCP `read-only` mode | 25 |
+| MCP `full` mode | 53 |
 
 The official [Hex MCP server](https://learn.hex.tech/docs/api-integrations/mcp-server) currently exposes four tools focused on project search and agent Threads. This project instead exposes the official public API as a curated MCP surface.
 
 ## Generation approach
 
 - FastMCP's OpenAPI provider builds tools from the official operation IDs and schemas.
+- A read-only MCP helper resolves project URLs through direct UUID extraction or paginated project-title matching.
 - Tool names are stable snake-case forms of official operation IDs.
 - `read-only` mode includes GET operations plus `ExportProject`, which is a non-mutating POST operation.
 - `full` mode includes every operation returned by the official specification.

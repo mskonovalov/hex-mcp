@@ -38,7 +38,10 @@ async def tool_names(bundle: ServerBundle) -> set[str]:
 @pytest.mark.parametrize(
     ("mode", "expected"),
     [
-        (MCPMode.READ_ONLY, {"list_projects", "export_project"}),
+        (
+            MCPMode.READ_ONLY,
+            {"list_projects", "export_project", "resolve_project_url"},
+        ),
         (
             MCPMode.FULL,
             {
@@ -47,6 +50,7 @@ async def tool_names(bundle: ServerBundle) -> set[str]:
                 "export_project",
                 "update_project",
                 "delete_project",
+                "resolve_project_url",
             },
         ),
     ],
@@ -138,6 +142,7 @@ async def test_tools_have_safety_annotations(loaded_openapi: LoadedOpenAPI) -> N
         list_annotations = tools["list_projects"].annotations
         export_annotations = tools["export_project"].annotations
         delete_annotations = tools["delete_project"].annotations
+        resolver_annotations = tools["resolve_project_url"].annotations
 
         assert list_annotations is not None
         assert list_annotations.readOnlyHint is True
@@ -148,6 +153,17 @@ async def test_tools_have_safety_annotations(loaded_openapi: LoadedOpenAPI) -> N
         assert delete_annotations is not None
         assert delete_annotations.destructiveHint is True
         assert delete_annotations.idempotentHint is True
+        assert resolver_annotations is not None
+        assert resolver_annotations.readOnlyHint is True
+        assert resolver_annotations.destructiveHint is False
+        assert resolver_annotations.idempotentHint is True
+        resolver_description = tools["resolve_project_url"].description
+        assert resolver_description is not None
+        assert "UUID" in resolver_description
+        assert (
+            tools["resolve_project_url"].parameters["properties"]["url"]["description"]
+            == "A Hex URL containing /hex/<uuid>/ or /app/<title>-<compact-id>/."
+        )
         assert tools["list_projects"].output_schema is not None
         assert (
             tools["list_projects"].output_schema
@@ -155,6 +171,51 @@ async def test_tools_have_safety_annotations(loaded_openapi: LoadedOpenAPI) -> N
         )
     finally:
         await bundle.api_client.aclose()
+
+
+async def test_resolve_project_url_tool_uses_accessible_project_title(
+    loaded_openapi: LoadedOpenAPI,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/v1/projects"
+        return httpx.Response(
+            200,
+            json={
+                "values": [
+                    {
+                        "id": "019f681a-1870-731d-bf1e-b82d136117fa",
+                        "title": "Profile Ads Health Dashboard",
+                        "owner": {"email": "owner@example.com"},
+                        "lastEditedAt": "2026-07-23T00:00:00Z",
+                    }
+                ],
+                "pagination": {"after": None},
+            },
+        )
+
+    bundle = build_server(
+        settings(MCPMode.READ_ONLY),
+        loaded_openapi,
+        api_transport=httpx.MockTransport(handler),
+    )
+    async with Client(bundle.server) as client:
+        result = await client.call_tool(
+            "resolve_project_url",
+            {
+                "url": (
+                    "https://app.hex.tech/link-tree/app/"
+                    "Profile-Ads-Health-Dashboard-033qADkKFIi4rt3feMxx3C/latest"
+                )
+            },
+        )
+
+    assert result.structured_content == {
+        "status": "resolved",
+        "projectId": "019f681a-1870-731d-bf1e-b82d136117fa",
+        "title": "Profile Ads Health Dashboard",
+        "candidates": [],
+        "message": "Matched the app URL title to one accessible Hex project.",
+    }
 
 
 @pytest.mark.parametrize(
